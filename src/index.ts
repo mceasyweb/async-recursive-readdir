@@ -24,6 +24,7 @@ export interface OptionsSearch {
   stats?: boolean;
   ignoreFolders?: boolean;
   extensions?: boolean;
+  exclude?: string[];
 }
 
 const defaultOptions: OptionsSearch = {
@@ -32,12 +33,13 @@ const defaultOptions: OptionsSearch = {
   stats: false,
   ignoreFolders: true,
   extensions: false,
+  exclude: [],
 };
 
 /**
- * Funzione che ritorna i dati Stats del file specificato come parametro
- * @param file Percorso del file
- * @returns i dati del file
+ * Function that returns the Stats data of the file specified as a parameter
+ * @param file File path
+ * @returns The file data
  */
 async function getStats(file: string) {
   return new Promise<fs.Stats | void>((done) =>
@@ -51,45 +53,69 @@ async function getStats(file: string) {
 }
 
 /**
- * recursive readdir async
- * Funzione ricorsiva asyncrona che analizza tutti i file e cartelle a partire da dir
- * @param dir Nome della directory da analizzare
- * @returns Lista dei dati dei file
+ * Function that excludes a file if the name partially matches the strings passed in listReg
+ * @param name File name
+ * @param listReg List containing the exclusion strings
+ * @returns Trure or False
+ */
+async function exclude(name: string, listReg: string[] = []): Promise<boolean> {
+  return new Promise<boolean>((done) => {
+    for (const exp of listReg) {
+      let regex = new RegExp(exp, 'i');
+      if (name.match(regex)) {
+        return done(true);
+      }
+    }
+    return done(false);
+  });
+}
+
+/**
+ * async recursive readdir
+ * Asynchronous recursive function that parses all files and folders starting from dir
+ * @param dir Name of the path to be scanned
+ * @returns File data list
  */
 export async function list(
   dir: string,
   options: OptionsSearch | null = {}
 ): Promise<Filetype[] | []> {
   options = { ...defaultOptions, ...options };
-  const dirents = await readdir(dir, { withFileTypes: true });
-  let results: any = [];
-  for (const dirent of dirents) {
-    const res = resolve(dir, dirent.name);
-    const fileStats = options.stats ? (await getStats(res)) || {} : {};
-    const extension = options.extensions ? extname(dirent.name) : '';
-    const filetype: Filetype = {
-      name: dirent.name,
-      title: basename(dirent.name, extension),
-      extension,
-      fullname: res,
-      isDirectory: dirent.isDirectory(),
-      path: dirname(res),
-      stats: fileStats,
-    };
-    if (dirent.isDirectory()) {
-      if (options.recursive) {
-        if (options.mode == Mode.LIST) {
-          results = [...results, ...(await list(res, options))];
+  try {
+    const dirents = await readdir(dir, { withFileTypes: true });
+    let results: any = [];
+    for (const dirent of dirents) {
+      const res = resolve(dir, dirent.name);
+      const fileStats = options.stats ? (await getStats(res)) || {} : {};
+      const extension = options.extensions ? extname(dirent.name) : '';
+      const filetype: Filetype = {
+        name: dirent.name,
+        title: basename(dirent.name, extension),
+        extension,
+        fullname: res,
+        isDirectory: dirent.isDirectory(),
+        path: dirname(res),
+        stats: fileStats,
+      };
+      if (!(await exclude(filetype.fullname, options.exclude))) {
+        if (dirent.isDirectory()) {
+          if (options.recursive) {
+            if (options.mode == Mode.LIST) {
+              results = [...results, ...(await list(res, options))];
+            } else {
+              filetype.content = await list(res, options);
+            }
+          }
+          if (!options.ignoreFolders) {
+            results.push(filetype);
+          }
         } else {
-          filetype.content = await list(res, options);
+          results.push(filetype);
         }
       }
-      if (!options.ignoreFolders) {
-        results.push(filetype);
-      }
-    } else {
-      results.push(filetype);
     }
+    return results;
+  } catch (error) {
+    throw error;
   }
-  return results;
 }
