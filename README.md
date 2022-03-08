@@ -6,6 +6,7 @@ Module to recursive read directory async (non blocking). NO dependencies.
 
 ```
 npm i https://github.com/mceasyweb/async-recursive-readdir.git
+build package
 ```
 
 After install, you can use the module using _import_ key (ES6):
@@ -52,6 +53,7 @@ An options object can be passed to configure the module.
 - **ignoreFolders (true | false)** : If it is true and the Mode is LIST it returns a list of files only.
   If it is true and the Mode is TREE and recursive is true, empty folders are not listed. If it is false all empty or non-empty folders are displayed. _Default: true_
 - **extension (true | false)** : If true it will be added to the object's `extension` property. _Default: false_
+- **exclude (Array of String)** : A list of names that are not returned if they find a partial match. _Default: []_
 
 ## Object structure
 
